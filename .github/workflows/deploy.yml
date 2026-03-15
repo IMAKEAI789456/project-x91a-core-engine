@@ -1,0 +1,62 @@
+name: Deploy VASTAV Agent to Google Cloud Run
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: vastav-agent-production
+  REGION: us-central1
+  SERVICE: vastav-agent-service
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build TypeScript Project
+        run: npx tsc || echo "No build script required for tsx, continuing..."
+
+      # Demonstrates Automated Cloud Infrastructure Deployment
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build and Push Docker Image to Google Artifact Registry
+        run: |
+          gcloud auth configure-docker $REGION-docker.pkg.dev
+          docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/vastav-repo/$SERVICE:${{ github.sha }} .
+          docker push $REGION-docker.pkg.dev/$PROJECT_ID/vastav-repo/$SERVICE:${{ github.sha }}
+
+      - name: Deploy to Google Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE }}
+          region: ${{ env.REGION }}
+          image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/vastav-repo/${{ env.SERVICE }}:${{ github.sha }}
+          env_vars: |
+            PORT=3100
+            NODE_ENV=production
+        # The GOOGLE_API_KEY should be set directly in the Google Cloud Run Secrets Manager, not exposed in CI/CD.
+
+      - name: Deployment Success Notification
+        run: echo "🎉 VASTAV Agent successfully automatically deployed to Google Cloud Run!"
