@@ -82,7 +82,7 @@ Follow these steps to deploy the VASTAV AI Ensemble on your local machine:
 
 **1. Clone the repository**
 ```bash
-git clone https://github.com/yourusername/vastav-agent.git
+git clone https://github.com/IMAKEAI789456/project-x91a-core-engine.git
 cd vastav-agent
 ```
 
