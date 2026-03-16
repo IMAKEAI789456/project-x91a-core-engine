@@ -54,5 +54,9 @@ export async function runJudge5(model: GenerativeModel, imageBase64: string, mim
   ]);
   const text = result.response.text().trim();
   const jsonStr = text.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/i, "").trim();
-  return JSON.parse(jsonStr);
+  try {
+    return JSON.parse(jsonStr);
+  } catch {
+    return { judge: "JUDGE-5", specialty: "Chief Justice & Comprehensive", verdict: "ERROR", confidence: 0, keyFindings: ["Failed to parse judge response"], reasoning: jsonStr.slice(0, 200) };
+  }
 }

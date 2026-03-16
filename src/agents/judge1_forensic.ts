@@ -54,7 +54,10 @@ export async function runJudge1(model: GenerativeModel, imageBase64: string, mim
     { inlineData: { data: imageBase64, mimeType } }
   ]);
   const text = result.response.text().trim();
-  // Strip markdown code fences if present
   const jsonStr = text.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/i, "").trim();
-  return JSON.parse(jsonStr);
+  try {
+    return JSON.parse(jsonStr);
+  } catch {
+    return { judge: "JUDGE-1", specialty: "Forensic & Biometric", verdict: "ERROR", confidence: 0, keyFindings: ["Failed to parse judge response"], reasoning: jsonStr.slice(0, 200) };
+  }
 }

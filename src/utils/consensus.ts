@@ -33,7 +33,7 @@ export function buildConsensus(judges: JudgeResult[]): ConsensusResult {
   const synthIdDetected = validJudges.some((j) => j.synthIdDetected === true);
 
   const summary =
-    `📊 CONSENSUS: ${realCount} REAL vs ${fakeCount} FAKE (${judges.length - totalValid} ERRORS) | ` +
+    `📊 CONSENSUS: ${realCount} REAL vs ${fakeCount} FAKE (${judges.length - totalValid} ABSTAINED) | ` +
     `🎯 STRENGTH: ${Math.round(consensusStrength * 100)}% | ` +
     `✅ FINAL: ${finalVerdict} @ ${adjustedConfidence}% confidence` +
     (synthIdDetected ? " | 🛡️ SYNTHID DETECTED" : "");

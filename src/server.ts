@@ -45,6 +45,11 @@ app.get("/AGENT.png", (_req, res) => {
 });
 
 // ─────────────────────────────────────────────────────
+// Static SFX files
+// ─────────────────────────────────────────────────────
+app.use("/sfx", express.static(path.join(process.cwd(), "SFX")));
+
+// ─────────────────────────────────────────────────────
 // GET / — Full Frontend Dashboard (V2 Hackathon Edition)
 // ─────────────────────────────────────────────────────
 app.get("/", (_req, res) => {
@@ -63,7 +68,7 @@ app.get("/", (_req, res) => {
         extend: {
           colors: {
             bg: '#050A14', bg2: '#0B1624', bg3: '#0f1f36',
-            cyan: '#00F5FF', blue: '#2BD9FF', green: '#00FFA3', red: '#FF3B5C',
+            cyan: '#00F5FF', blue: '#2BD9FF', green: '#00FFA3', red: '#FF3B5C', purple: '#7B61FF',
           },
           fontFamily: {
             sans: ['Inter', 'sans-serif'],
@@ -74,10 +79,12 @@ app.get("/", (_req, res) => {
             'spin-slow': 'spin 8s linear infinite',
             'pulse-glow': 'pulseGlow 3s ease-in-out infinite',
             'cyber-scan': 'cyberScan 2s linear infinite',
+            'grad-shift': 'gradShift 3s ease infinite',
           },
           keyframes: {
             pulseGlow: { '0%, 100%': { opacity: 0.5 }, '50%': { opacity: 1, filter: 'drop-shadow(0 0 10px #00F5FF)' } },
-            cyberScan: { '0%': { transform: 'translateY(-100%)' }, '100%': { transform: 'translateY(100%)' } }
+            cyberScan: { '0%': { transform: 'translateY(-100%)' }, '100%': { transform: 'translateY(100%)' } },
+            gradShift: { '0%': { backgroundPosition: '0% 50%' }, '50%': { backgroundPosition: '100% 50%' }, '100%': { backgroundPosition: '0% 50%' } }
           }
         }
       }
@@ -143,6 +150,20 @@ app.get("/", (_req, res) => {
     .text-glow { text-shadow: 0 0 20px rgba(0, 245, 255, 0.5); }
     
     #root-app { position: relative; z-index: 10; min-height: 100vh; display: flex; flex-direction: column; }
+    
+    /* Scanning bar animation for live judge cards */
+    @keyframes scanBar {
+      0% { transform: translateX(-100%); }
+      50% { transform: translateX(150%); }
+      100% { transform: translateX(350%); }
+    }
+  
+    /* Onboarding animations */
+    @keyframes ob-fadein { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes ob-pulse { 0%,100% { opacity:0.4; } 50% { opacity:1; } }
+    @keyframes ob-spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+    .ob-step { animation: ob-fadein 0.8s ease forwards; }
+    .ob-line { animation: ob-fadein 0.3s ease forwards; }
   </style>
 </head>
 <body>
@@ -158,13 +179,14 @@ app.get("/", (_req, res) => {
     const { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } = window.Recharts;
 
     const judgeNames = [
-      { short: 'J1', name: 'Forensic & Biometric', key: 'forensic' },
-      { short: 'J2', name: 'AI Artifacts & Neural', key: 'artifacts' },
-      { short: 'J3', name: 'Contextual & Semantic', key: 'context' },
-      { short: 'J4', name: 'Physics & Lighting', key: 'physics' },
-      { short: 'J5', name: 'Chief Justice', key: 'chief' },
-      { short: 'J6', name: 'SynthID Specialist', key: 'synthid' },
+      { short: 'J1', name: 'Forensic & Biometric', icon: '🔬', desc: 'Edge signatures & biometric analysis' },
+      { short: 'J2', name: 'AI Artifacts & Neural', icon: '🧬', desc: 'GAN/Diffusion detection & EXIF audit' },
+      { short: 'J3', name: 'Contextual & Semantic', icon: '🧠', desc: 'Semantic logic & cultural consistency' },
+      { short: 'J4', name: 'Physics & Lighting', icon: '⚡', desc: '3D light vectors & gravity analysis' },
+      { short: 'J5', name: 'Chief Justice', icon: '👑', desc: 'Aggregating all signals' },
+      { short: 'J6', name: 'SynthID Specialist', icon: '🛡️', desc: 'Google SynthID watermark detection' },
     ];
+    const JUDGE_PHASES = ['INITIALIZING', 'SCANNING', 'DELIBERATING', 'COMPLETE'];
 
     function Typewriter({ text, speed = 30, className = "" }) {
       const [displayed, setDisplayed] = useState('');
@@ -180,14 +202,277 @@ app.get("/", (_req, res) => {
       return <span className={className}>{displayed}<span className="animate-pulse">_</span></span>;
     }
 
-    function App() {
+    const BOOT_LINES = [
+      '> VASTAV AGENT v4.0 — BOOT SEQUENCE INITIATED',
+      '> Loading Google Gemini 2.5 Flash Neural Core...',
+      '> Mounting 6 Judicial AI Modules...',
+      '> J1: Forensic & Biometric .............. [OK]',
+      '> J2: AI Artifacts & Neural ............. [OK]',
+      '> J3: Contextual & Semantic ............. [OK]',
+      '> J4: Physics & Lighting ................ [OK]',
+      '> J5: Chief Justice ..................... [OK]',
+      '> J6: SynthID Specialist ................ [OK]',
+      '> Consensus Engine ...................... [ONLINE]',
+      '> SFX Audio Pipeline .................... [ACTIVE]',
+      '> EXIF Metadata Extractor ............... [READY]',
+      '> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '> ALL SYSTEMS OPERATIONAL. AWAITING OPERATOR.',
+    ];
+
+    // ====== ONBOARDING COMPONENT ======
+    const BOOT_MSGS = [
+      '> VASTAV AGENT v4.0 — BOOT SEQUENCE INITIATED',
+      '> Loading Google Gemini 2.5 Flash Neural Core...',
+      '> Mounting 6 Judicial AI Modules...',
+      '> J1: Forensic & Biometric .............. [OK]',
+      '> J2: AI Artifacts & Neural ............. [OK]',
+      '> J3: Contextual & Semantic ............. [OK]',
+      '> J4: Physics & Lighting ................ [OK]',
+      '> J5: Chief Justice ..................... [OK]',
+      '> J6: SynthID Specialist ................ [OK]',
+      '> Consensus Engine ...................... [ONLINE]',
+      '> ALL SYSTEMS OPERATIONAL. AWAITING OPERATOR.'
+    ];
+    const OB_LABELS = ['Forensic','Neural','Context','Physics','Chief','SynthID'];
+
+    function OnboardingScreen({ onEnter }) {
+      const [step, setStep] = React.useState(0);
+      const [bootLines, setBootLines] = React.useState([]);
+      const [activeNodes, setActiveNodes] = React.useState(0);
+      const [dataFlow, setDataFlow] = React.useState(0);
+
+      const skip = React.useCallback(() => {
+        setStep(s => s < 3 ? 3 : s);
+      }, []);
+
+      React.useEffect(() => {
+        const h = () => skip();
+        window.addEventListener('keydown', h);
+        return () => window.removeEventListener('keydown', h);
+      }, [skip]);
+
+      React.useEffect(() => {
+        if (step !== 0) return;
+        const t = setTimeout(() => setStep(1), 5000);
+        return () => clearTimeout(t);
+      }, [step]);
+
+      React.useEffect(() => {
+        if (step !== 1) return;
+        setBootLines([]);
+        setActiveNodes(0);
+        let idx = 0;
+        let cancelled = false;
+        const tick = () => {
+          if (cancelled) return;
+          if (idx < BOOT_MSGS.length) {
+            const msg = BOOT_MSGS[idx];
+            if (msg) {
+              setBootLines(prev => [...prev, msg]);
+              if (idx >= 3 && idx <= 8) setActiveNodes(idx - 2);
+            }
+            idx++;
+            setTimeout(tick, 340);
+          } else {
+            setTimeout(() => { if (!cancelled) setStep(2); }, 1800);
+          }
+        };
+        setTimeout(tick, 300);
+        return () => { cancelled = true; };
+      }, [step]);
+
+      React.useEffect(() => {
+        if (step !== 2) return;
+        const ft = setInterval(() => setDataFlow(p => (p + 1) % 4), 1200);
+        // Step 2 does NOT auto-advance — user clicks Continue
+        return () => { clearInterval(ft); };
+      }, [step]);
+
+      const S = { position:'relative', zIndex:1 };
+
+      return React.createElement('div', {
+        style: { position:'fixed',inset:0,zIndex:9999,overflow:'hidden',fontFamily:'Inter,sans-serif',background:'#050505',color:'#F5F5F7',cursor: step < 3 ? 'pointer' : 'default' },
+        onClick: step < 3 ? skip : null
+      },
+        // Background glow
+        React.createElement('div', { style:{ position:'absolute',inset:0,pointerEvents:'none',background:'radial-gradient(ellipse at 50% 40%, rgba(0,229,255,0.05) 0%, transparent 55%)' } }),
+
+        // Skip hint
+        step < 3 && React.createElement('div', {
+          style:{ position:'absolute',bottom:'2rem',right:'2rem',fontSize:10,color:'rgba(255,255,255,0.2)',textTransform:'uppercase',letterSpacing:'0.3em',zIndex:10,userSelect:'none' }
+        }, 'Press any key to skip →'),
+
+        // STEP 0: Philosophy
+        step === 0 && React.createElement('div', {
+          style:{ position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',textAlign:'center',padding:'0 2rem',animation:'ob-fadein 2s ease forwards' }
+        },
+          React.createElement('div', { style:{ width:8,height:8,borderRadius:'50%',background:'#00E5FF',boxShadow:'0 0 24px #00E5FF',margin:'0 auto 5rem',animation:'ob-pulse 2.5s ease-in-out infinite' } }),
+          React.createElement('h1', { style:{ fontSize:'clamp(1.8rem,4.5vw,4rem)',fontWeight:300,lineHeight:1.35,color:'rgba(255,255,255,0.88)',letterSpacing:'-0.025em',marginBottom:'1.25rem' } }, 'Truth is rarely singular.'),
+          React.createElement('p', { style:{ fontSize:'clamp(1.5rem,4vw,3.5rem)',fontWeight:300,color:'#fff',letterSpacing:'-0.025em',textShadow:'0 0 80px rgba(0,229,255,0.25)' } }, 'It emerges from consensus.')
+        ),
+
+        // STEP 1: Boot Sequence
+        step === 1 && React.createElement('div', {
+          style:{ position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'0 1.5rem',animation:'ob-fadein 0.8s ease forwards' }
+        },
+          // Neural center dot
+          React.createElement('div', { style:{ position:'relative',marginBottom:'3.5rem' } },
+            React.createElement('div', { style:{ position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:80,height:80,borderRadius:'50%',background:'rgba(0,229,255,0.07)',filter:'blur(20px)',animation:'ob-pulse 2s infinite' } }),
+            React.createElement('div', { style:{ width:10,height:10,borderRadius:'50%',background:'#00E5FF',boxShadow:'0 0 30px #00E5FF',position:'relative',zIndex:1 } })
+          ),
+          // 6 nodes
+          React.createElement('div', { style:{ display:'flex',gap:'1.75rem',marginBottom:'3.5rem',alignItems:'flex-start' } },
+            OB_LABELS.map((label, i) =>
+              React.createElement('div', { key:i, style:{ display:'flex',flexDirection:'column',alignItems:'center',gap:8 } },
+                React.createElement('div', { style:{ width:12,height:12,borderRadius:'50%',background: activeNodes > i ? '#00E5FF' : 'rgba(255,255,255,0.1)',boxShadow: activeNodes > i ? '0 0 20px #00E5FF' : 'none',transform: activeNodes > i ? 'scale(1)' : 'scale(0.5)',transition:'all 0.6s ease' } }),
+                React.createElement('span', { style:{ fontSize:8,color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'0.06em',whiteSpace:'nowrap' } }, label)
+              )
+            )
+          ),
+          // Boot messages
+          React.createElement('div', { style:{ width:'100%',maxWidth:640,display:'flex',flexDirection:'column',gap:9 } },
+            bootLines.filter(Boolean).map((line, i) => {
+              const isOnline = line.includes('[ONLINE]') || line.includes('OPERATIONAL');
+              const isOk = line.includes('[OK]');
+              return React.createElement('div', { key:i, style:{ fontSize:12,fontFamily:'JetBrains Mono,monospace',letterSpacing:'0.04em',color: isOnline ? '#00E5FF' : isOk ? 'rgba(0,255,163,0.7)' : 'rgba(255,255,255,0.45)',textShadow: isOnline ? '0 0 20px rgba(0,229,255,0.5)' : 'none',fontWeight: isOnline ? 500 : 400,animation:'ob-fadein 0.4s ease forwards' } }, line);
+            })
+          )
+        ),
+
+        // STEP 2: Architecture Diagram
+        step === 2 && React.createElement('div', {
+          style:{ position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'0 1.5rem',animation:'ob-fadein 1s ease forwards' }
+        },
+          React.createElement('p', { style:{ fontSize:9,color:'rgba(255,255,255,0.3)',textTransform:'uppercase',letterSpacing:'0.4em',marginBottom:'4rem' } }, 'System Architecture'),
+          React.createElement('div', { style:{ display:'flex',alignItems:'center',gap:'1.5rem',flexWrap:'wrap',justifyContent:'center',maxWidth:900 } },
+            // Evidence
+            React.createElement('div', { style:{ display:'flex',flexDirection:'column',alignItems:'center',gap:12 } },
+              React.createElement('div', { style:{ width:64,height:64,borderRadius:'50%',border: dataFlow===0 ? '1px solid rgba(0,229,255,0.6)' : '1px solid rgba(255,255,255,0.1)',display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.5)',boxShadow: dataFlow===0 ? '0 0 30px rgba(0,229,255,0.2)' : 'none',transition:'all 1.5s ease' } },
+                React.createElement('div', { style:{ width:8,height:8,borderRadius:'50%',background:'rgba(255,255,255,0.5)',animation:'ob-pulse 2s infinite' } })
+              ),
+              React.createElement('span', { style:{ fontSize:8,color:'rgba(255,255,255,0.4)',textTransform:'uppercase',letterSpacing:'0.12em',whiteSpace:'nowrap' } }, 'Evidence Input')
+            ),
+            React.createElement('div', { style:{ color:'rgba(0,229,255,0.5)',fontSize:22,filter:'drop-shadow(0 0 6px rgba(0,229,255,0.4))' } }, '→'),
+            // Judges
+            React.createElement('div', { style:{ display:'flex',flexDirection:'column',gap:7 } },
+              React.createElement('span', { style:{ fontSize:8,color:'rgba(255,255,255,0.25)',textTransform:'uppercase',letterSpacing:'0.1em',textAlign:'center',marginBottom:8 } }, 'AI Analysis Layer'),
+              OB_LABELS.map((label, i) =>
+                React.createElement('div', { key:i, style:{ display:'flex',alignItems:'center',gap:10 } },
+                  React.createElement('div', { style:{ width:30,height:24,borderRadius:7,border:'1px solid rgba(0,229,255,0.2)',background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center' } },
+                    React.createElement('div', { style:{ width:6,height:6,borderRadius:'50%',background:'#00E5FF',boxShadow:'0 0 8px #00E5FF',animation:'ob-pulse 2s infinite',animationDelay:(i*0.15)+'s' } })
+                  ),
+                  React.createElement('span', { style:{ fontSize:9,color:'rgba(255,255,255,0.35)' } }, label)
+                )
+              )
+            ),
+            React.createElement('div', { style:{ color:'rgba(123,97,255,0.6)',fontSize:22,filter:'drop-shadow(0 0 6px rgba(123,97,255,0.4))' } }, '→'),
+            // Consensus
+            React.createElement('div', { style:{ display:'flex',flexDirection:'column',alignItems:'center',gap:12 } },
+              React.createElement('div', { style:{ width:68,height:68,borderRadius:'50%',border: dataFlow===2 ? '1px solid rgba(123,97,255,0.6)' : '1px solid rgba(123,97,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.5)',position:'relative',boxShadow: dataFlow===2 ? '0 0 30px rgba(123,97,255,0.25)' : 'none',transition:'all 1.5s ease' } },
+                React.createElement('div', { style:{ position:'absolute',inset:0,borderRadius:'50%',border:'1px dashed rgba(123,97,255,0.3)',animation:'ob-spin-slow 15s linear infinite' } }),
+                React.createElement('div', { style:{ width:10,height:10,borderRadius:'50%',background:'#7B61FF',boxShadow:'0 0 20px #7B61FF',zIndex:1 } })
+              ),
+              React.createElement('span', { style:{ fontSize:8,color:'rgba(255,255,255,0.4)',textTransform:'uppercase',letterSpacing:'0.12em',whiteSpace:'nowrap' } }, 'Consensus Engine')
+            ),
+            React.createElement('div', { style:{ color:'rgba(255,255,255,0.3)',fontSize:22 } }, '→'),
+            // Verdict
+            React.createElement('div', { style:{ display:'flex',flexDirection:'column',alignItems:'center',gap:12 } },
+              React.createElement('div', { style:{ width:64,height:64,borderRadius:'50%',border: dataFlow===3 ? '1px solid rgba(255,255,255,0.5)' : '1px solid rgba(255,255,255,0.15)',display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.5)',boxShadow: dataFlow===3 ? '0 0 30px rgba(255,255,255,0.15)' : 'none',transition:'all 1.5s ease' } },
+                React.createElement('div', { style:{ width:3,height:28,background:'rgba(255,255,255,0.75)',borderRadius:2 } })
+              ),
+              React.createElement('span', { style:{ fontSize:8,color:'rgba(255,255,255,0.4)',textTransform:'uppercase',letterSpacing:'0.12em' } }, 'Final Verdict')
+            )
+          ),
+          React.createElement('p', { style:{ marginTop:'3.5rem',fontSize:15,color:'rgba(255,255,255,0.4)',fontWeight:300,letterSpacing:'0.02em',animation:'ob-fadein 1s ease 1s both' } }, 'Multiple intelligences. One verified truth.'),
+          React.createElement('button', {
+            onClick: (e) => { e.stopPropagation(); setStep(3); },
+            style:{ marginTop:'2.5rem',padding:'0.75rem 2.5rem',borderRadius:40,border:'1px solid rgba(255,255,255,0.2)',background:'rgba(255,255,255,0.04)',color:'rgba(255,255,255,0.7)',fontSize:11,letterSpacing:'0.2em',textTransform:'uppercase',cursor:'pointer',fontFamily:'Inter,sans-serif',backdropFilter:'blur(10px)',transition:'all 0.4s ease',animation:'ob-fadein 1s ease 1.5s both' },
+            onMouseOver:(e)=>{ e.currentTarget.style.borderColor='rgba(0,229,255,0.5)'; e.currentTarget.style.color='#00E5FF'; e.currentTarget.style.boxShadow='0 0 20px rgba(0,229,255,0.15)'; },
+            onMouseOut:(e)=>{ e.currentTarget.style.borderColor='rgba(255,255,255,0.2)'; e.currentTarget.style.color='rgba(255,255,255,0.7)'; e.currentTarget.style.boxShadow='none'; }
+          }, 'Continue →')
+        ),
+
+        // STEP 3: Auth
+        step === 3 && React.createElement('div', {
+          style:{ position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'0 2rem',animation:'ob-fadein 1.2s ease forwards' }
+        },
+          // Rotating aura
+          React.createElement('div', { style:{ position:'absolute',top:'50%',left:'50%',width:500,height:500,borderRadius:'50%',background:'conic-gradient(from 0deg, rgba(0,229,255,0.05), rgba(123,97,255,0.05), rgba(0,229,255,0.05))',filter:'blur(60px)',animation:'ob-spin-aura 30s linear infinite',pointerEvents:'none',zIndex:0 } }),
+
+          React.createElement('div', { style:{ position:'relative',zIndex:1,width:'100%',maxWidth:400,display:'flex',flexDirection:'column',alignItems:'center' } },
+            // Logo  
+            React.createElement('div', { style:{ position:'relative',marginBottom:'3rem' } },
+              React.createElement('div', { style:{ position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:80,height:80,borderRadius:'50%',background:'rgba(0,229,255,0.15)',filter:'blur(25px)',animation:'ob-pulse 4s ease infinite' } }),
+              React.createElement('img', { src:'/AGENT.png',alt:'VASTAV',style:{ width:72,height:72,position:'relative',zIndex:1,filter:'drop-shadow(0 0 20px rgba(0,229,255,0.4))' },onError:(e)=>{ e.target.style.display='none'; } })
+            ),
+            React.createElement('h2', { style:{ fontSize:10,color:'rgba(255,255,255,0.35)',textTransform:'uppercase',letterSpacing:'0.55em',marginBottom:'2.5rem',fontWeight:300 } }, 'Operator Access Required'),
+            // Panel
+            React.createElement('div', { style:{ width:'100%',background:'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.07)',padding:'2.25rem',borderRadius:24,backdropFilter:'blur(40px)',boxShadow:'0 20px_80px rgba(0,0,0,0.6)',boxSizing:'border-box' } },
+              React.createElement('div', { style:{ display:'flex',flexDirection:'column',gap:'0.875rem',marginBottom:'2rem' } },
+                React.createElement('input', { type:'text',disabled:true,value:'VASTAV-0X-ADMIN',style:{ width:'100%',boxSizing:'border-box',background:'rgba(0,0,0,0.35)',border:'1px solid rgba(255,255,255,0.07)',padding:'0.9rem 1.25rem',fontSize:13,color:'rgba(255,255,255,0.55)',borderRadius:12,outline:'none',fontFamily:'Inter,sans-serif',letterSpacing:'0.05em' } }),
+                React.createElement('input', { type:'password',disabled:true,value:'••••••••••••',style:{ width:'100%',boxSizing:'border-box',background:'rgba(0,0,0,0.35)',border:'1px solid rgba(255,255,255,0.07)',padding:'0.9rem 1.25rem',fontSize:13,color:'rgba(255,255,255,0.55)',borderRadius:12,outline:'none',fontFamily:'Inter,sans-serif',letterSpacing:'0.25em' } })
+              ),
+              React.createElement('button', { onClick:onEnter,style:{ width:'100%',padding:'1.1rem',borderRadius:12,background:'#fff',color:'#000',fontSize:12,fontWeight:600,letterSpacing:'0.18em',textTransform:'uppercase',border:'none',cursor:'pointer',transition:'all 0.3s ease',fontFamily:'Inter,sans-serif',boxShadow:'0 8px 30px rgba(255,255,255,0.1)' },onMouseOver:(e)=>{ e.currentTarget.style.transform='scale(1.02)'; },onMouseOut:(e)=>{ e.currentTarget.style.transform='scale(1)'; } }, 'Access System')
+            ),
+            // Credits
+            React.createElement('div', { style:{ marginTop:'3rem',textAlign:'center',animation:'ob-fadein 1s ease 0.5s both' } },
+              React.createElement('p', { style:{ fontSize:8,color:'rgba(255,255,255,0.25)',textTransform:'uppercase',letterSpacing:'0.4em',marginBottom:'0.6rem',fontWeight:300 } }, 'Engineered By'),
+              React.createElement('p', { style:{ fontSize:14,color:'rgba(255,255,255,0.85)',letterSpacing:'0.25em',textTransform:'uppercase',fontWeight:300,textShadow:'0 0 30px rgba(255,255,255,0.15)' } }, 'NAVNEET SINGH'),
+              React.createElement('p', { style:{ fontSize:8,color:'rgba(0,229,255,0.5)',letterSpacing:'0.3em',textTransform:'uppercase',marginTop:'0.6rem',fontWeight:300,animation:'ob-glow 3s ease-in-out infinite' } }, 'Ekoahamdutivnasti Technologies')
+            )
+          )
+        )
+      );
+    }
+    
+function App() {
+      const [showOnboarding, setShowOnboarding] = useState(true);
       const [file, setFile] = useState(null);
       const [preview, setPreview] = useState(null);
       const [status, setStatus] = useState('IDLE'); // IDLE, SCANNING, RESULT
       const [logs, setLogs] = useState([]);
       const [result, setResult] = useState(null);
       const [investigatorName, setInvestigatorName] = useState("");
+      const [judgeStates, setJudgeStates] = useState(judgeNames.map(() => ({ phase: 0, dots: 0 })));
       const logBoxRef = useRef(null);
+      const judgeTimersRef = useRef([]);
+
+      // SFX Audio
+      const scanAudio = useRef(null);
+      const endAudio = useRef(null);
+      const notfakeAudio = useRef(null);
+      const wrongAudio = useRef(null);
+      useEffect(() => {
+        scanAudio.current = new Audio('/sfx/SCAN.mp3');
+        endAudio.current = new Audio('/sfx/END.mp3');
+        notfakeAudio.current = new Audio('/sfx/notfake.mp3');
+        wrongAudio.current = new Audio('/sfx/wrong.mp3');
+        scanAudio.current.volume = 0.4;
+        endAudio.current.volume = 0.7;
+        notfakeAudio.current.volume = 0.8;
+        wrongAudio.current.volume = 0.8;
+      }, []);
+      const playScan = () => {
+        if (scanAudio.current) {
+          scanAudio.current.currentTime = 0;
+          scanAudio.current.play().catch(() => {});
+        }
+      };
+      const playEnd = () => {
+        if (endAudio.current) {
+          endAudio.current.currentTime = 0;
+          endAudio.current.play().catch(() => {});
+        }
+      };
+      const playVerdict = (isReal) => {
+        if (isReal && notfakeAudio.current) {
+          notfakeAudio.current.currentTime = 0;
+          notfakeAudio.current.play().catch(() => {});
+        } else if (!isReal && wrongAudio.current) {
+          wrongAudio.current.currentTime = 0;
+          wrongAudio.current.play().catch(() => {});
+        }
+      };
 
       // Create particles on mount
       useEffect(() => {
@@ -221,22 +506,49 @@ app.get("/", (_req, res) => {
 
       const addLog = (msg) => setLogs(p => [...p, { time: new Date().toLocaleTimeString(), msg }]);
 
+      // Animate each judge through phases with staggered delays
+      const startJudgeAnimations = () => {
+        setJudgeStates(judgeNames.map(() => ({ phase: 0, dots: 0 })));
+        judgeTimersRef.current.forEach(t => clearInterval(t));
+        judgeTimersRef.current = [];
+
+        judgeNames.forEach((_, idx) => {
+          const startDelay = idx * 600;
+          let currentPhase = 0;
+          const phaseTimer = setInterval(() => {
+            currentPhase = Math.min(currentPhase + 1, 2);
+            setJudgeStates(prev => prev.map((s, i) => i === idx ? { ...s, phase: currentPhase } : s));
+            playScan(); // 🔊 Play scan SFX on each phase transition
+            if (currentPhase >= 2) clearInterval(phaseTimer);
+          }, 1800);
+
+          const dotsTimer = setInterval(() => {
+            setJudgeStates(prev => prev.map((s, i) => i === idx ? { ...s, dots: (s.dots + 1) % 4 } : s));
+          }, 500);
+
+          judgeTimersRef.current.push(phaseTimer, dotsTimer);
+
+          setTimeout(() => {
+            setJudgeStates(prev => prev.map((s, i) => i === idx ? { ...s, phase: 0 } : s));
+          }, startDelay);
+        });
+      };
+
+      const stopJudgeAnimations = (verdict) => {
+        judgeTimersRef.current.forEach(t => clearInterval(t));
+        judgeTimersRef.current = [];
+        setJudgeStates(judgeNames.map(() => ({ phase: 3, dots: 0 })));
+        playEnd(); // 🔊 Play end SFX when judges complete
+        // Play verdict-specific SFX after a short delay
+        setTimeout(() => playVerdict(verdict === 'REAL'), 800);
+      };
+
       const runAnalysis = async () => {
         if(!file) return;
         setStatus('SCANNING');
         addLog("[SYS] Initializing VASTAV Agent Core System...");
         addLog("[NET] Connecting to ensemble models...");
-        
-        const phases = [
-          { t: 800, msg: "[J1] Forensic Scanner active. Analyzing edge signatures." },
-          { t: 1500, msg: "[J2] Neural net probing for GAN/Diffusion artifacts." },
-          { t: 2500, msg: "[J3] Context semantic tree building." },
-          { t: 3200, msg: "[J4] Calculating 3D light vectors & physics rules." },
-          { t: 4000, msg: "[J6] Decrypting pixels for SynthID waterings." },
-          { t: 4800, msg: "[J5] Chief Justice aggregating confidence scores." }
-        ];
-        
-        phases.forEach(p => setTimeout(() => addLog(p.msg), p.t));
+        startJudgeAnimations();
 
         try {
           const fd = new FormData();
@@ -245,15 +557,17 @@ app.get("/", (_req, res) => {
           const data = await res.json();
           if(!res.ok) throw new Error(data.error);
           
-          addLog("[SYS] Consensus reached. Generating report.");
+          addLog("[SYS] All 6 Judges deliberated. Consensus reached.");
+          stopJudgeAnimations(data.result.consensus.finalVerdict);
           setTimeout(() => {
             setResult(data.result);
             setStatus('RESULT');
-          }, 1000);
+          }, 1200);
         } catch (err) {
+          stopJudgeAnimations();
           addLog("[ERR] " + err.message);
-          if (err.message.includes("quota") || err.message.includes("429")) {
-            addLog("[SYS] ERRROR: Google Gemini API Free Tier Quota Exceeded. Please wait a few minutes or use a paid account.");
+          if (err.message && (err.message.includes("quota") || err.message.includes("429"))) {
+            addLog("[SYS] ERROR: Google Gemini API Free Tier Quota Exceeded. Please wait a few minutes or use a paid account.");
           }
           setStatus('IDLE');
         }
@@ -300,7 +614,11 @@ app.get("/", (_req, res) => {
       })) : [];
 
       return (
-        <div className="flex flex-col min-h-screen">
+        <>
+          <AnimatePresence>
+            {showOnboarding && <OnboardingScreen key="onboarding" onEnter={() => setShowOnboarding(false)} />}
+          </AnimatePresence>
+          <div className="flex flex-col min-h-screen">
           {/* NAVBAR */}
           <nav className="glass-panel sticky top-0 z-50 px-6 py-4 flex justify-between items-center border-b-0 border-t-0 border-x-0">
             <div className="flex items-center gap-4">
@@ -387,21 +705,68 @@ app.get("/", (_req, res) => {
 
                 {/* TERMINAL / ACTION BUTTON */}
                 {(file || status !== 'IDLE') && status !== 'RESULT' && (
-                  <motion.div initial={{opacity:0, y:20}} animate={{opacity:1, y:0}} className="glass-panel rounded-2xl p-4 flex flex-col gap-4">
+                  <motion.div initial={{opacity:0, y:20}} animate={{opacity:1, y:0}} className="flex flex-col gap-4">
                     {status === 'IDLE' ? (
-                      <button onClick={runAnalysis} className="w-full py-4 rounded-xl bg-cyan hover:bg-[#2BD9FF] text-bg font-display font-bold text-lg tracking-widest uppercase transition-all hover:shadow-[0_0_30px_rgba(0,245,255,0.5)] active:scale-95">
-                        Run Diagnostics
+                      <button onClick={runAnalysis} className="w-full py-4 rounded-xl bg-gradient-to-r from-cyan via-blue to-cyan bg-[length:200%_100%] hover:bg-right text-bg font-display font-bold text-lg tracking-widest uppercase transition-all duration-500 hover:shadow-[0_0_40px_rgba(0,245,255,0.6)] active:scale-95">
+                        ⚡ INITIATE SCAN SEQUENCE
                       </button>
                     ) : (
-                      <div className="h-[200px] bg-black/50 rounded-xl border border-cyan/20 p-4 font-mono text-xs text-cyan flex flex-col">
-                        <div className="flex items-center gap-2 mb-2 pb-2 border-b border-cyan/20">
-                          <div className="w-2 h-2 bg-cyan rounded-full animate-ping"></div>
-                          <span>SYSTEM_LOG // VASTAV_AGENT_KERNEL</span>
+                      <div className="flex flex-col gap-3">
+                        {/* Live System Log */}
+                        <div className="h-[100px] bg-black/70 rounded-xl border border-cyan/20 p-3 font-mono text-xs text-cyan flex flex-col">
+                          <div className="flex items-center gap-2 mb-2 pb-1 border-b border-cyan/20">
+                            <div className="w-2 h-2 bg-cyan rounded-full animate-ping"></div>
+                            <span className="text-[10px] tracking-widest uppercase">VASTAV_KERNEL // LIVE_FEED</span>
+                          </div>
+                          <div ref={logBoxRef} className="flex-1 overflow-y-auto terminal-scroll flex flex-col gap-0.5">
+                            {logs.map((L,i) => (
+                              <div key={i} className="text-[10px]"><span className="text-slate-600">[{L.time}]</span> <span className={L.msg.startsWith('[ERR]') ? 'text-red' : L.msg.startsWith('[SYS]') ? 'text-cyan/70' : 'text-green'}>{L.msg}</span></div>
+                            ))}
+                          </div>
                         </div>
-                        <div ref={logBoxRef} className="flex-1 overflow-y-auto terminal-scroll flex flex-col gap-1">
-                          {logs.map((L,i) => (
-                            <div key={i}><span className="text-slate-500">[{L.time}]</span> <Typewriter text={L.msg} speed={10}/></div>
-                          ))}
+
+                        {/* LIVE JUDGE DECISION PANEL */}
+                        <div className="font-mono text-[10px] text-slate-400 uppercase tracking-widest flex items-center gap-2 px-1">
+                          <div className="w-1.5 h-1.5 bg-cyan rounded-full animate-pulse"></div>
+                          Live Tribunal — 6 Judges Active
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {judgeNames.map((jn, idx) => {
+                            const js = judgeStates[idx];
+                            const phaseLabel = JUDGE_PHASES[js.phase];
+                            const dots = '.'.repeat(js.dots);
+                            const phaseColor = js.phase === 0 ? 'text-slate-500 border-slate-700' : js.phase === 1 ? 'text-cyan border-cyan/40' : js.phase === 2 ? 'text-yellow-400 border-yellow-400/40' : 'text-green border-green/40';
+                            const bgColor = js.phase === 0 ? 'bg-black/30' : js.phase === 1 ? 'bg-cyan/5' : js.phase === 2 ? 'bg-yellow-400/5' : 'bg-green/5';
+                            const glowClass = js.phase === 1 ? 'shadow-[0_0_15px_rgba(0,245,255,0.15)]' : js.phase === 2 ? 'shadow-[0_0_15px_rgba(250,204,21,0.15)]' : '';
+                            return (
+                              <motion.div
+                                key={idx}
+                                initial={{opacity:0, scale:0.9}}
+                                animate={{opacity:1, scale:1}}
+                                transition={{delay: idx * 0.1}}
+                                className={\`rounded-xl border p-3 flex flex-col gap-1.5 transition-all duration-300 \${bgColor} \${phaseColor} \${glowClass}\`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-base leading-none">{jn.icon}</span>
+                                  <span className={\`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border \${phaseColor} \${bgColor}\`}>{phaseLabel}{js.phase < 3 ? dots : ''}</span>
+                                </div>
+                                <div className="font-mono text-[10px] text-slate-300 font-semibold leading-tight">{jn.short} / {jn.name}</div>
+                                <div className="text-[9px] text-slate-500 leading-tight">{jn.desc}</div>
+                                {/* Pulsing activity bar */}
+                                {js.phase > 0 && js.phase < 3 && (
+                                  <div className="h-0.5 w-full bg-black/50 rounded-full overflow-hidden mt-1">
+                                    <div
+                                      className={\`h-full rounded-full \${js.phase === 1 ? 'bg-cyan' : 'bg-yellow-400'}\`}
+                                      style={{animation: 'scanBar 1.5s ease-in-out infinite', width: '40%'}}
+                                    />
+                                  </div>
+                                )}
+                                {js.phase === 3 && (
+                                  <div className="h-0.5 w-full bg-green/30 rounded-full mt-1"></div>
+                                )}
+                              </motion.div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -478,8 +843,9 @@ app.get("/", (_req, res) => {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {result.judges.map((j, i) => {
                       const isReal = j.verdict === 'REAL';
-                      const colorClass = isReal ? 'text-green border-green/30 bg-green/5' : 'text-red border-red/30 bg-red/5';
-                      const barClass = isReal ? 'bg-green shadow-[0_0_10px_#00FFA3]' : 'bg-red shadow-[0_0_10px_#FF3B5C]';
+                      const isNoVote = j.verdict === 'NO_VOTE';
+                      const colorClass = isNoVote ? 'text-slate-400 border-slate-500/30 bg-slate-500/5' : isReal ? 'text-green border-green/30 bg-green/5' : 'text-red border-red/30 bg-red/5';
+                      const barClass = isNoVote ? 'bg-slate-500 shadow-[0_0_10px_#64748b]' : isReal ? 'bg-green shadow-[0_0_10px_#00FFA3]' : 'bg-red shadow-[0_0_10px_#FF3B5C]';
                       
                       return (
                         <motion.div initial={{opacity:0, y:20}} animate={{opacity:1, y:0}} transition={{delay: i*0.1}} key={i} className={\`glass-panel rounded-xl p-4 hover:-translate-y-1 transition-transform border border-white/5\`}>
@@ -520,6 +886,7 @@ app.get("/", (_req, res) => {
             VASTAV AGENT DEEPFAKE DETECTION SYSTEM // PORT {${PORT}} // CREATED BY NAVNEET SINGH
           </footer>
         </div>
+        </>
       );
     }
 
