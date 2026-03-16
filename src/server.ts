@@ -186,6 +186,7 @@ app.get("/", (_req, res) => {
       const [status, setStatus] = useState('IDLE'); // IDLE, SCANNING, RESULT
       const [logs, setLogs] = useState([]);
       const [result, setResult] = useState(null);
+      const [investigatorName, setInvestigatorName] = useState("");
       const logBoxRef = useRef(null);
 
       // Create particles on mount
@@ -267,8 +268,10 @@ app.get("/", (_req, res) => {
             (j.keyFindings||[]).map(f=> '• '+f).join('\\n')
           ).join('\\n\\n');
 
+          const reportNumber = 'RPT-X91A-' + Math.random().toString(36).substr(2, 6).toUpperCase() + '-' + Date.now().toString().slice(-4);
           const body = {
-            caseId: 'VDC-' + Date.now(),
+            caseId: reportNumber,
+            investigator: investigatorName || "Internal System",
             results: judgeText,
             confidence: c.adjustedConfidence + '%',
             isReal: c.finalVerdict === 'REAL'
@@ -453,9 +456,19 @@ app.get("/", (_req, res) => {
                       </div>
                     </div>
 
-                    <button onClick={downloadPDF} className="relative z-10 mt-8 w-full py-4 rounded-xl border border-cyan/40 bg-cyan/10 hover:bg-cyan/20 hover:shadow-[0_0_30px_rgba(0,245,255,0.3)] hover:-translate-y-1 text-cyan cursor-pointer font-display font-bold text-sm tracking-widest uppercase transition-all duration-300 flex items-center justify-center gap-3">
-                      <i data-lucide="download" className="w-5 h-5 animate-bounce"></i> DOWNLOAD VASTAV OFFICIAL INTELLIGENCE REPORT
-                    </button>
+                    <div className="mt-8 flex flex-col gap-2 relative z-10 w-full">
+                      <label className="text-xs font-mono text-cyan ml-1">Investigating Officer (Optional)</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. Special Agent Smith, Cyber Div" 
+                        value={investigatorName}
+                        onChange={(e) => setInvestigatorName(e.target.value)}
+                        className="w-full bg-black/50 border border-cyan/30 rounded-xl px-4 py-3 text-white font-mono text-sm outline-none focus:border-cyan transition-colors focus:shadow-[0_0_15px_rgba(0,245,255,0.2)]"
+                      />
+                      <button onClick={downloadPDF} className="w-full py-4 rounded-xl border border-cyan/40 bg-cyan/10 hover:bg-cyan/20 hover:shadow-[0_0_30px_rgba(0,245,255,0.3)] hover:-translate-y-1 text-cyan cursor-pointer font-display font-bold text-sm tracking-widest uppercase transition-all duration-300 flex items-center justify-center gap-3 mt-2">
+                        <i data-lucide="download" className="w-5 h-5 animate-bounce"></i> DOWNLOAD VASTAV OFFICIAL INTELLIGENCE REPORT
+                      </button>
+                    </div>
                   </motion.div>
 
                   {/* 6 JUDGE GRID */}
@@ -1220,7 +1233,7 @@ app.post("/analyze-base64", async (req, res) => {
 // ─────────────────────────────────────────────────────
 app.post("/generate-pdf", async (req, res) => {
   try {
-    const { caseId, results, imageBase64, mimeType, confidence, isReal, metadata = {} } = req.body;
+    const { caseId, investigator, results, imageBase64, mimeType, confidence, isReal, metadata = {} } = req.body;
 
     // Build the Raw Judge Telemetry HTML
     const formattedResults = (results || "No analysis data available.")
@@ -1275,7 +1288,8 @@ app.post("/generate-pdf", async (req, res) => {
         </div>
         <div class="text-right font-mono text-[10px] text-[#64748B]">
           <div class="text-[#00F5FF] mb-1">DATE: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</div>
-          <div>CASE REF: ${caseId || "N/A"}</div>
+          <div>REPORT NO: ${caseId || "N/A"}</div>
+          <div>INVESTIGATOR: ${investigator || "Internal System"}</div>
           <div>ENGINE: Google Gemini 2.5 Flash Lite Core</div>
         </div>
       </div>
@@ -1314,7 +1328,10 @@ app.post("/generate-pdf", async (req, res) => {
           </h2>
           <div class="space-y-3">
             <div class="flex justify-between p-3 rounded bg-[#0A1628] border border-white/5 font-mono text-xs">
-              <span class="text-[#64748B]">Case ID Signature</span><span class="text-white">${caseId || "N/A"}</span>
+              <span class="text-[#64748B]">Report Signature</span><span class="text-white">${caseId || "N/A"}</span>
+            </div>
+            <div class="flex justify-between p-3 rounded bg-[#0A1628] border border-white/5 font-mono text-xs">
+              <span class="text-[#64748B]">Reporting Officer</span><span class="text-[#00F5FF] break-all max-w-[50%] text-right">${investigator || "Internal System"}</span>
             </div>
             <div class="flex justify-between p-3 rounded bg-[#0A1628] border border-white/5 font-mono text-xs">
               <span class="text-[#64748B]">File Format (MIME)</span><span class="text-white">${mimeType || "image/jpeg"}</span>
