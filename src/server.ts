@@ -1889,7 +1889,7 @@ function clearPort(port: number): Promise<void> {
 
 // Clear port before starting
 clearPort(Number(PORT)).then(() => {
-  app.listen(PORT, () => {
+  app.listen(Number(PORT), "0.0.0.0", () => {
     console.log(`\n╔═══════════════════════════════════════════════════╗`);
     console.log(`║       VASTAV AGENT — Server Running               ║`);
     console.log(`║       Port: ${PORT}                               ║`);
