@@ -8,7 +8,7 @@
   [![Status](https://img.shields.io/badge/Status-Active-success.svg?style=for-the-badge)](#)
   [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](#)
 
-  [**Live Demo (Placeholder)**](https://your-demo-url-here.com) | [**Report a Bug**](#)
+  [**Live Demo (Placeholder)**](agent.ekoahamdutvnasti.com) | [**Report a Bug**](#)
 
   *Built by Navneet Singh, Ekoahamdutivnasti Technologies*  
   `#GeminiLiveAgentChallenge`
