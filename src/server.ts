@@ -6,6 +6,7 @@ import fs from "fs";
 import path from "path";
 import puppeteer from "puppeteer";
 import exif from "exif-reader";
+import { exec } from "child_process";
 import { runJudgePanel } from "./agents/judgePanel.js";
 
 dotenv.config();
@@ -156,6 +157,24 @@ app.get("/", (_req, res) => {
       0% { transform: translateX(-100%); }
       50% { transform: translateX(150%); }
       100% { transform: translateX(350%); }
+    }
+    
+    /* Terminal scanline effect */
+    @keyframes scan {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(100%); }
+    }
+    
+    /* Log slide in animation */
+    @keyframes slideIn {
+      from { 
+        opacity: 0; 
+        transform: translateX(-10px);
+      }
+      to { 
+        opacity: 1; 
+        transform: translateX(0);
+      }
     }
   
     /* Onboarding animations */
@@ -557,6 +576,13 @@ function App() {
           const data = await res.json();
           if(!res.ok) throw new Error(data.error);
           
+          // Display all the real-time logs from the backend
+          if (data.logs && Array.isArray(data.logs)) {
+            data.logs.forEach(logMsg => {
+              addLog(logMsg);
+            });
+          }
+          
           addLog("[SYS] All 6 Judges deliberated. Consensus reached.");
           stopJudgeAnimations(data.result.consensus.finalVerdict);
           setTimeout(() => {
@@ -712,21 +738,76 @@ function App() {
                       </button>
                     ) : (
                       <div className="flex flex-col gap-3">
-                        {/* Live System Log */}
-                        <div className="h-[100px] bg-black/70 rounded-xl border border-cyan/20 p-3 font-mono text-xs text-cyan flex flex-col">
-                          <div className="flex items-center gap-2 mb-2 pb-1 border-b border-cyan/20">
-                            <div className="w-2 h-2 bg-cyan rounded-full animate-ping"></div>
-                            <span className="text-[10px] tracking-widest uppercase">VASTAV_KERNEL // LIVE_FEED</span>
+                        {/* Enhanced Live System Log */}
+                        <div className="relative h-[120px] bg-gradient-to-br from-black via-black to-cyan/5 rounded-xl border border-cyan/30 p-4 font-mono text-xs overflow-hidden shadow-[0_0_30px_rgba(0,245,255,0.1)]">
+                          {/* Scanline effect */}
+                          <div className="absolute inset-0 pointer-events-none opacity-10">
+                            <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,245,255,0.03)_50%)] bg-[length:100%_4px] animate-[scan_8s_linear_infinite]"></div>
                           </div>
-                          <div ref={logBoxRef} className="flex-1 overflow-y-auto terminal-scroll flex flex-col gap-0.5">
-                            {logs.map((L,i) => (
-                              <div key={i} className="text-[10px]"><span className="text-slate-600">[{L.time}]</span> <span className={L.msg.startsWith('[ERR]') ? 'text-red' : L.msg.startsWith('[SYS]') ? 'text-cyan/70' : 'text-green'}>{L.msg}</span></div>
-                            ))}
+                          
+                          {/* Header */}
+                          <div className="flex items-center justify-between mb-3 pb-2 border-b border-cyan/20 relative z-10">
+                            <div className="flex items-center gap-2">
+                              <div className="relative">
+                                <div className="w-2 h-2 bg-cyan rounded-full animate-pulse"></div>
+                                <div className="absolute inset-0 w-2 h-2 bg-cyan rounded-full animate-ping"></div>
+                              </div>
+                              <span className="text-[10px] tracking-[0.2em] uppercase text-cyan font-bold">VASTAV_KERNEL</span>
+                              <span className="text-[8px] text-cyan/40">v1.0.0</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <div className="w-1.5 h-1.5 rounded-full bg-green animate-pulse"></div>
+                              <span className="text-[8px] text-green/70 uppercase tracking-wider">LIVE</span>
+                            </div>
                           </div>
+                          
+                          {/* Log content */}
+                          <div ref={logBoxRef} className="flex-1 overflow-y-auto terminal-scroll flex flex-col gap-1 relative z-10 max-h-[70px]">
+                            {logs.map((L, i) => {
+                              const isError = L.msg.startsWith('[ERR]');
+                              const isSystem = L.msg.startsWith('[SYS]');
+                              const isNetwork = L.msg.startsWith('[NET]');
+                              const isJudge = L.msg.startsWith('[JUDGE]');
+                              
+                              return (
+                                <div 
+                                  key={i} 
+                                  className={\`text-[10px] leading-relaxed transition-all duration-300 \${i === logs.length - 1 ? 'opacity-100' : 'opacity-60'}\`}
+                                  style={{ 
+                                    animation: i === logs.length - 1 ? 'slideIn 0.3s ease-out' : 'none'
+                                  }}
+                                >
+                                  <span className="text-slate-600 mr-2">[{L.time}]</span>
+                                  <span className={\`\${
+                                    isError ? 'text-red font-bold' : 
+                                    isSystem ? 'text-cyan' : 
+                                    isNetwork ? 'text-blue' :
+                                    isJudge ? 'text-purple' :
+                                    'text-green'
+                                  }\`}>
+                                    {isError && '⚠ '}
+                                    {isSystem && '⚙ '}
+                                    {isNetwork && '🌐 '}
+                                    {isJudge && '⚖ '}
+                                    {L.msg}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                            {logs.length === 0 && (
+                              <div className="text-[10px] text-slate-500 italic flex items-center gap-2">
+                                <div className="w-1 h-1 bg-slate-500 rounded-full animate-pulse"></div>
+                                Awaiting analysis initialization...
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Bottom glow */}
+                          <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-cyan/5 to-transparent pointer-events-none"></div>
                         </div>
 
                         {/* LIVE JUDGE DECISION PANEL */}
-                        <div className="font-mono text-[10px] text-slate-400 uppercase tracking-widest flex items-center gap-2 px-1">
+                        <div className="font-mono text-[10px] text-slate-400 uppercase tracking-widest flex items-center gap-2 px-1 mt-4">
                           <div className="w-1.5 h-1.5 bg-cyan rounded-full animate-pulse"></div>
                           Live Tribunal — 6 Judges Active
                         </div>
@@ -1504,6 +1585,12 @@ app.post("/analyze", upload.single("file"), async (req, res) => {
   const filePath = req.file.path;
   const mimeType = req.file.mimetype;
   const isVideo = mimeType.startsWith("video/");
+  
+  // Store progress messages for this request
+  const progressMessages: string[] = [];
+  const onProgress = (msg: string) => {
+    progressMessages.push(msg);
+  };
 
   try {
     log(`Incoming File: ${req.file.originalname} (${(req.file.size/1024/1024).toFixed(2)} MB, type: ${mimeType})`, "UPLOAD");
@@ -1513,6 +1600,7 @@ app.post("/analyze", upload.single("file"), async (req, res) => {
 
     if (isVideo) {
       log(`Starting VIDEO multi-judge panel analysis`, "SYSTEM");
+      onProgress("[SYS] Processing video file...");
       const { extractFramesFromVideo } = await import("./utils/videoProcessor.js");
       const frames = await extractFramesFromVideo(fileBuffer);
       
@@ -1521,8 +1609,8 @@ app.post("/analyze", upload.single("file"), async (req, res) => {
       }
       
       log(`Successfully extracted ${frames.length} frames. Feeding frame 1 to Judges.`, "VIDEO");
-      // Passing the first clear extracted frame as a JPEG to the image judges
-      panelResult = await runJudgePanel(apiKey, frames[Math.floor(frames.length/2)], "image/jpeg");
+      onProgress(`[SYS] Extracted ${frames.length} frames from video`);
+      panelResult = await runJudgePanel(apiKey, frames[Math.floor(frames.length/2)], "image/jpeg", undefined, onProgress);
       
     } else {
       log(`Starting IMAGE multi-judge panel analysis`, "SYSTEM");
@@ -1543,13 +1631,15 @@ app.post("/analyze", upload.single("file"), async (req, res) => {
             metadataText += `- ColorSpace: ${exifData.exif.ColorSpace || "Unknown"}\n`;
           }
           log("Successfully parsed image EXIF metadata", "SYSTEM");
+          onProgress("[SYS] EXIF metadata extracted successfully");
         }
       } catch (err: any) {
         log(`No EXIF metadata or failed to parse: ${err.message}`, "SYSTEM");
+        onProgress("[SYS] No EXIF metadata found (common for AI-generated images)");
       }
 
       const imageBase64 = fileBuffer.toString("base64");
-      panelResult = await runJudgePanel(apiKey, imageBase64, mimeType, metadataText);
+      panelResult = await runJudgePanel(apiKey, imageBase64, mimeType, metadataText, onProgress);
     }
 
     log(`Consensus: ${panelResult.consensus.summary}`, "JUDGE");
@@ -1558,6 +1648,7 @@ app.post("/analyze", upload.single("file"), async (req, res) => {
       success: true,
       file: req.file.originalname,
       result: panelResult,
+      logs: progressMessages, // Include all progress messages
     });
   } catch (err: any) {
     log(`Analysis error: ${err.message}`, "ERROR");
@@ -1780,17 +1871,34 @@ app.post("/generate-pdf", async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────
-// Start server
+// Auto-clear port before starting server
 // ─────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`\n╔═══════════════════════════════════════════════════╗`);
-  console.log(`║       VASTAV AGENT — Server Running               ║`);
-  console.log(`║       Port: ${PORT}                               ║`);
-  console.log(`║       Endpoints:                                  ║`);
-  console.log(`║         GET  /          (Frontend Dashboard)      ║`);
-  console.log(`║         GET  /health                              ║`);
-  console.log(`║         POST /analyze        (multipart/form-data)║`);
-  console.log(`║         POST /analyze-base64 (JSON body)          ║`);
-  console.log(`║         POST /generate-pdf   (PDF Report)         ║`);
-  console.log(`╚═══════════════════════════════════════════════════╝\n`);
+
+function clearPort(port: number): Promise<void> {
+  return new Promise((resolve) => {
+    exec(`lsof -ti:${port} | xargs kill -9 2>/dev/null || true`, (error) => {
+      if (error) {
+        console.log(`⚠️  Port ${port} was already free`);
+      } else {
+        console.log(`✅ Cleared port ${port}`);
+      }
+      resolve();
+    });
+  });
+}
+
+// Clear port before starting
+clearPort(Number(PORT)).then(() => {
+  app.listen(PORT, () => {
+    console.log(`\n╔═══════════════════════════════════════════════════╗`);
+    console.log(`║       VASTAV AGENT — Server Running               ║`);
+    console.log(`║       Port: ${PORT}                               ║`);
+    console.log(`║       Endpoints:                                  ║`);
+    console.log(`║         GET  /          (Frontend Dashboard)      ║`);
+    console.log(`║         GET  /health                              ║`);
+    console.log(`║         POST /analyze        (multipart/form-data)║`);
+    console.log(`║         POST /analyze-base64 (JSON body)          ║`);
+    console.log(`║         POST /generate-pdf   (PDF Report)         ║`);
+    console.log(`╚═══════════════════════════════════════════════════╝\n`);
+  });
 });

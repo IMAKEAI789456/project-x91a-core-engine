@@ -1,4 +1,4 @@
-import { GenerativeModel } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
 export const JUDGE6_INSTRUCTION = `YOU ARE THE SYNTHID & GOOGLE AI DETECTION SPECIALIST (JUDGE-6) IN VASTAV AGENT V4.1'S ELITE DETECTION PANEL.
 
@@ -95,12 +95,21 @@ Always respond in this exact JSON only:
   "synthIdDetected": true or false
 }`;
 
-export async function runJudge6(model: GenerativeModel, imageBase64: string, mimeType: string) {
-  const result = await model.generateContent([
-    JUDGE6_INSTRUCTION,
-    { inlineData: { data: imageBase64, mimeType } }
-  ]);
-  const text = result.response.text().trim();
+export async function runJudge6(ai: GoogleGenAI, imageBase64: string, mimeType: string) {
+  const result = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: [
+      JUDGE6_INSTRUCTION,
+      {
+        inlineData: {
+          data: imageBase64,
+          mimeType
+        }
+      }
+    ]
+  });
+  
+  const text = result.text?.trim() || "";
   const jsonStr = text.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/i, "").trim();
   try {
     return JSON.parse(jsonStr);

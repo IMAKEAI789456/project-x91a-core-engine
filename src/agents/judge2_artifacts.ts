@@ -1,4 +1,4 @@
-import { GenerativeModel } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
 export const JUDGE2_INSTRUCTION = `YOU ARE THE AI ARTIFACTS & NEURAL PATTERNS EXPERT (JUDGE-2) IN VASTAV AGENT V4.0'S ELITE DETECTION PANEL.
 
@@ -53,16 +53,25 @@ Always respond in this exact JSON only:
   "reasoning": "explanation"
 }`;
 
-export async function runJudge2(model: GenerativeModel, imageBase64: string, mimeType: string, metadataText?: string) {
+export async function runJudge2(ai: GoogleGenAI, imageBase64: string, mimeType: string, metadataText?: string) {
   const finalInstruction = metadataText 
     ? `${JUDGE2_INSTRUCTION}\n\n═══════════════════════════════════════════════════════════════\nPROVIDED EXIF METADATA:\n${metadataText}`
     : JUDGE2_INSTRUCTION;
 
-  const result = await model.generateContent([
-    finalInstruction,
-    { inlineData: { data: imageBase64, mimeType } }
-  ]);
-  const text = result.response.text().trim();
+  const result = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: [
+      finalInstruction,
+      {
+        inlineData: {
+          data: imageBase64,
+          mimeType
+        }
+      }
+    ]
+  });
+  
+  const text = result.text?.trim() || "";
   const jsonStr = text.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/i, "").trim();
   
   try {
