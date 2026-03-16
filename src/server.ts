@@ -562,6 +562,17 @@ function App() {
         setTimeout(() => playVerdict(verdict === 'REAL'), 800);
       };
 
+      const speakVerdict = (res) => {
+        if (!window.speechSynthesis) return;
+        const c = res.consensus;
+        const judgeCount = res.judges.filter(j => j.verdict === c.finalVerdict).length;
+        const text = 'Analysis complete. ' + judgeCount + ' out of 6 judges detected this as ' + c.finalVerdict + '. Confidence: ' + c.adjustedConfidence + ' percent.';
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1;
+        utterance.pitch = 1;
+        window.speechSynthesis.speak(utterance);
+      };
+
       const runAnalysis = async () => {
         if(!file) return;
         setStatus('SCANNING');
@@ -585,6 +596,7 @@ function App() {
           
           addLog("[SYS] All 6 Judges deliberated. Consensus reached.");
           stopJudgeAnimations(data.result.consensus.finalVerdict);
+          speakVerdict(data.result); // 🔊 Speak the verdict
           setTimeout(() => {
             setResult(data.result);
             setStatus('RESULT');
